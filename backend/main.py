@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     n_clusters: int = 8
     max_neighbours: int = 40
     allow_origins: List[str] = ["*"]  # In production, set to your frontend URL
+    umap_n_components: int = 2
+    umap_n_neighbors: int = 15
+    umap_min_dist: float = 0.1
+    umap_metric: str = "cosine"
+    word_vector_cache_size: int = 10_000
+    layout_cache_size: int = 100
     
     class Config:
         env_file = ".env"
@@ -31,14 +37,14 @@ GLOVE = api.load("glove-wiki-gigaword-100")   # Should be already downloaded dur
 print(f"GloVe embeddings loaded in {time.time() - start_time:.2f} seconds")
 DIM = 100
 
-# Create an LRU cache for word vectors (10,000 entries) and UMAP results
-@functools.lru_cache(maxsize=10_000)
+# Create an LRU cache for word vectors and UMAP results
+@functools.lru_cache(maxsize=settings.word_vector_cache_size)
 def vec(word: str) -> np.ndarray:
     if word in GLOVE:
         return GLOVE[word]
     raise KeyError(f"'{word}' not found in vocabulary")
 
-@functools.lru_cache(maxsize=100)
+@functools.lru_cache(maxsize=settings.layout_cache_size)
 def generate_layout_and_clusters(frozen_vocab: frozenset) -> tuple:
     """
     Generate UMAP layout and clusters for a given vocabulary set.
@@ -49,10 +55,10 @@ def generate_layout_and_clusters(frozen_vocab: frozenset) -> tuple:
     
     # Generate 2D layout
     coords = umap.UMAP(
-        n_components=2,
-        n_neighbors=15,
-        min_dist=0.1,
-        metric="cosine",
+        n_components=settings.umap_n_components,
+        n_neighbors=settings.umap_n_neighbors,
+        min_dist=settings.umap_min_dist,
+        metric=settings.umap_metric,
         random_state=42
     ).fit_transform(M)
     
@@ -102,7 +108,7 @@ app.add_middleware(
 )
 
 # LRU cache for build_map results (100 entries, smaller than word vectors cache)
-map_cache = LRUCache(maxsize=100)
+map_cache = LRUCache(maxsize=settings.layout_cache_size)
 
 # ---------- Core algorithm ---------- #
 def find_common_neighbors(word1: str, word2: str, n: int = 10) -> List[str]:
