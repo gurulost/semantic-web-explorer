@@ -46,6 +46,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",
     "cytoscape-graphml": "^1.0.6",
+    "cytoscape-svg": "^0.4.0",
     "date-fns": "^3.6.0",
     "embla-carousel-react": "^8.3.0",
     "input-otp": "^1.2.4",

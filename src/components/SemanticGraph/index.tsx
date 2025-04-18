@@ -1,5 +1,6 @@
-
 import React, { useRef } from 'react';
+import cytoscape from 'cytoscape';
+import cytoscapeSvg from 'cytoscape-svg';
 import CytoscapeComponent from 'react-cytoscapejs';
 import { Download, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
+
+// Register the SVG plugin
+cytoscape.use(cytoscapeSvg);
 
 interface SemanticGraphProps {
   nodes: Node[];
@@ -40,7 +44,7 @@ const SemanticGraph: React.FC<SemanticGraphProps> = ({
     const svg = cyRef.current.svg({
       scale: 2,
       full: true,
-      output: 'svg'
+      output: 'string'
     });
     
     const blob = new Blob([svg], { type: 'image/svg+xml' });
