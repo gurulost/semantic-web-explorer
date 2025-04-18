@@ -1,73 +1,52 @@
-# Welcome to your Lovable project
 
-## Project info
+# Semantic Web Explorer
 
-**URL**: https://lovable.dev/projects/d505be12-bac5-41ff-8fe7-d591152b4b68
+A visualization tool that displays semantic relationships between words using GloVe word embeddings.
 
-## How can I edit this code?
+## Project Structure
 
-There are several ways of editing your application.
+- `/frontend` - React/Vite frontend application
+- `/backend` - FastAPI backend service providing word embeddings and semantic mapping
 
-**Use Lovable**
+## Setup and Running
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/d505be12-bac5-41ff-8fe7-d591152b4b68) and start prompting.
+### Backend
 
-Changes made via Lovable will be committed automatically to this repo.
+1. Set up Python environment:
+   ```bash
+   cd backend
+   python -m venv .venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
 
-**Use your preferred IDE**
+2. Run the backend server:
+   ```bash
+   uvicorn main:app --reload --port 8000
+   ```
+   
+   The first run will download the GloVe embeddings (~200MB) which may take a few minutes.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Frontend
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+1. Install dependencies:
+   ```bash
+   cd frontend
+   npm install
+   ```
 
-Follow these steps:
+2. Run development server:
+   ```bash
+   npm run dev
+   ```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+## Development Configuration
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+- The frontend automatically connects to the backend using a proxy in development mode
+- For production, set the `VITE_API_BASE_URL` environment variable to your deployed backend URL
 
-# Step 3: Install the necessary dependencies.
-npm i
+## Features
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/d505be12-bac5-41ff-8fe7-d591152b4b68) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+- Search for any English word to visualize its semantic relationships
+- Interactive graph with zoom, pan, and hover functionality
+- Color-coded word clusters based on semantic similarity
