@@ -1,14 +1,29 @@
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List, Tuple, Optional
+from pydantic import BaseModel, BaseSettings
+from typing import List, Tuple, Optional, Dict
 import numpy as np
 import umap
 import gensim.downloader as api
 from sklearn.cluster import KMeans
 import os
 import time
+import functools
+from cachetools import LRUCache
+
+# ---------- Configuration ---------- #
+class Settings(BaseSettings):
+    glove_home: str = ""  # Default empty uses gensim's cache location
+    n_clusters: int = 8
+    max_neighbours: int = 40
+    allow_origins: List[str] = ["*"]  # In production, set to your frontend URL
+    
+    class Config:
+        env_file = ".env"
+        env_prefix = "APP_"
+
+settings = Settings()
 
 # ---------- Load embeddings once ---------- #
 print("Loading GloVe 100-d embeddings... (this might take a few minutes on first run)")
@@ -17,6 +32,8 @@ GLOVE = api.load("glove-wiki-gigaword-100")   # Should be already downloaded dur
 print(f"GloVe embeddings loaded in {time.time() - start_time:.2f} seconds")
 DIM = 100
 
+# Create an LRU cache for word vectors (10,000 entries)
+@functools.lru_cache(maxsize=10_000)
 def vec(word: str) -> np.ndarray:
     if word in GLOVE:
         return GLOVE[word]
@@ -29,7 +46,7 @@ def cosine_similarity(v1: np.ndarray, v2: np.ndarray) -> float:
 class Query(BaseModel):
     query: str
     second_word: Optional[str] = None
-    n: int = 40       # how many neighbours to return
+    n: int = settings.max_neighbours  # how many neighbours to return
 
 class Node(BaseModel):
     id: str
@@ -53,10 +70,13 @@ app = FastAPI(title="Semantic-Map API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.allow_origins,
     allow_methods=["POST"],
     allow_headers=["*"],
 )
+
+# LRU cache for build_map results (100 entries, smaller than word vectors cache)
+map_cache = LRUCache(maxsize=100)
 
 # ---------- Core algorithm ---------- #
 def find_common_neighbors(word1: str, word2: str, n: int = 10) -> List[str]:
@@ -76,6 +96,11 @@ def find_common_neighbors(word1: str, word2: str, n: int = 10) -> List[str]:
     return [w for w in all_words[top_idx] if w not in [word1, word2]]
 
 def build_map(root: str, second_word: Optional[str], n: int) -> MapResponse:
+    # Check cache first
+    cache_key = f"{root}:{second_word or ''}:{n}"
+    if cache_key in map_cache:
+        return map_cache[cache_key]
+    
     try:
         v_root = vec(root)
         
@@ -130,7 +155,7 @@ def build_map(root: str, second_word: Optional[str], n: int) -> MapResponse:
         ).fit_transform(M)
         
         # Clustering for colors
-        kmeans = KMeans(n_clusters=8, n_init="auto", random_state=42).fit(M)
+        kmeans = KMeans(n_clusters=settings.n_clusters, n_init="auto", random_state=42).fit(M)
         clusters = kmeans.labels_.tolist()
         
         # Generate nodes
@@ -147,7 +172,12 @@ def build_map(root: str, second_word: Optional[str], n: int) -> MapResponse:
         if second_word and second_word in vocab:
             edges.extend([[second_word, w] for w in vocab if w not in [root, second_word]])
         
-        return MapResponse(nodes=nodes, edges=edges, comparison=comparison)
+        result = MapResponse(nodes=nodes, edges=edges, comparison=comparison)
+        
+        # Cache the result
+        map_cache[cache_key] = result
+        
+        return result
         
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Word '{root}' not found in vocabulary")
@@ -156,3 +186,4 @@ def build_map(root: str, second_word: Optional[str], n: int) -> MapResponse:
 @app.post("/map", response_model=MapResponse)
 def get_map(q: Query):
     return build_map(q.query.lower(), q.second_word.lower() if q.second_word else None, q.n)
+

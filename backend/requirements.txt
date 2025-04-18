@@ -6,3 +6,4 @@ umap-learn==0.5.4
 scikit-learn==1.3.0
 numpy==1.25.2
 pydantic==2.3.0
+cachetools==5.3.1
