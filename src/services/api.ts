@@ -43,8 +43,8 @@ export const getSemanticMap = async (
       params.cursor = cursor;
     }
     
-    // Make the API request
-    const response = await axios.get(`${API_BASE_URL}/semantic-map`, { params });
+    // Make the API request to the /map endpoint
+    const response = await axios.post(`${API_BASE_URL}/map`, params);
     return response.data;
   } catch (error) {
     if (axios.isAxiosError(error)) {
