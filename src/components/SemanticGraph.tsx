@@ -1,16 +1,28 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import CytoscapeComponent from 'react-cytoscapejs';
 import { Download, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Node } from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
+import cytoscape from 'cytoscape';
+import graphml from 'cytoscape-graphml';
+import chroma from 'chroma-js';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
 
+// Augment cytoscape with the SVG export functionality
 declare module 'cytoscape' {
   interface Core {
     svg(options?: { scale?: number; full?: boolean; output?: 'string' | 'svg' }): string;
   }
 }
 
+// Register the graphml extension
 cytoscape.use(graphml);
 
 interface SemanticGraphProps {

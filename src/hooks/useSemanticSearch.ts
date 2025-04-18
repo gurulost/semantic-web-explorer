@@ -46,8 +46,11 @@ export function useSemanticSearch() {
     ...state,
     setSearch: (query: string, secondWord?: string) => 
       dispatch({ type: 'SET_SEARCH', payload: { query, secondWord } }),
-    setMap: (map: MapResponse | null) => 
-      dispatch({ type: 'SET_MAP', payload: map }),
+    setMap: (map: MapResponse | ((prev: MapResponse | null) => MapResponse | null)) => 
+      dispatch({ 
+        type: 'SET_MAP', 
+        payload: typeof map === 'function' ? map(state.semanticMap) : map 
+      }),
     reset: () => dispatch({ type: 'RESET' })
   };
 }

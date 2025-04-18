@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import SearchBar from '@/components/SearchBar';
@@ -16,7 +17,7 @@ const Index = () => {
   const { toast } = useToast();
   const [cursor, setCursor] = useState<number | null>(null);
 
-  const { data, error, isLoading, fetchNextPage } = useQuery({
+  const { data, error, isLoading } = useQuery({
     queryKey: ['semanticMap', searchTerm, secondWord, cursor],
     queryFn: () => getSemanticMap(searchTerm, secondWord, cursor),
     enabled: !!searchTerm,
@@ -29,12 +30,15 @@ const Index = () => {
       setMap(data);
       addToHistory(searchTerm, secondWord);
     } else {
-      setMap(prev => prev ? {
-        ...prev,
-        nodes: [...prev.nodes, ...data.nodes],
-        edges: [...prev.edges, ...data.edges],
-        next_cursor: data.next_cursor
-      } : data);
+      setMap(prevMap => {
+        if (!prevMap) return data;
+        return {
+          ...prevMap,
+          nodes: [...prevMap.nodes, ...data.nodes],
+          edges: [...prevMap.edges, ...data.edges],
+          next_cursor: data.next_cursor
+        };
+      });
     }
     
     if (data.comparison) {
