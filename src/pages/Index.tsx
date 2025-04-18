@@ -1,51 +1,42 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import SearchBar from '@/components/SearchBar';
 import SemanticGraph from '@/components/SemanticGraph';
 import Legend from '@/components/Legend';
-import { getSemanticMap, Node, MapResponse } from '@/services/api';
+import { getSemanticMap } from '@/services/api';
 import { useToast } from '@/components/ui/use-toast';
-import { ComparisonResult } from '@/services/api';
+import { useQuery } from '@tanstack/react-query';
+import { useSemanticSearch } from '@/hooks/useSemanticSearch';
 
 const Index = () => {
-  const [semanticMap, setSemanticMap] = useState<MapResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [secondWord, setSecondWord] = useState<string | undefined>();
+  const { searchTerm, secondWord, semanticMap, setSearch, setMap } = useSemanticSearch();
   const { toast } = useToast();
 
-  const handleSearch = async (query: string, second?: string) => {
-    setLoading(true);
-    setSearchTerm(query);
-    setSecondWord(second);
-    
-    try {
-      const result = await getSemanticMap(query, second);
-      setSemanticMap(result);
-      
-      if (result.comparison) {
+  const { isLoading } = useQuery({
+    queryKey: ['semanticMap', searchTerm, secondWord],
+    queryFn: () => getSemanticMap(searchTerm, secondWord),
+    enabled: !!searchTerm,
+    onSuccess: (data) => {
+      setMap(data);
+      if (data.comparison) {
         toast({
           title: "Word Comparison",
-          description: result.comparison.similarity_explanation,
+          description: data.comparison.similarity_explanation,
         });
       }
-    } catch (error) {
-      let message = 'Failed to generate semantic map';
-      
-      if (error instanceof Error) {
-        message = error.message;
-      }
-      
+    },
+    onError: (error: Error) => {
       toast({
         title: 'Error',
-        description: message,
+        description: error.message,
         variant: 'destructive',
       });
-      
-      setSemanticMap(null);
-    } finally {
-      setLoading(false);
+      setMap(null);
     }
+  });
+
+  const handleSearch = async (query: string, second?: string) => {
+    setSearch(query, second);
   };
 
   return (
@@ -65,7 +56,7 @@ const Index = () => {
         <div className="max-w-7xl mx-auto w-full flex-1 flex flex-col">
           {/* Search bar */}
           <div className="mb-6 flex justify-center">
-            <SearchBar onSearch={handleSearch} isLoading={loading} />
+            <SearchBar onSearch={handleSearch} isLoading={isLoading} />
           </div>
           
           {/* Graph visualization */}
@@ -74,13 +65,13 @@ const Index = () => {
               <SemanticGraph 
                 nodes={semanticMap?.nodes || []} 
                 edges={semanticMap?.edges || []} 
-                isLoading={loading}
+                isLoading={isLoading}
               />
             </CardContent>
           </Card>
           
           {/* Info section */}
-          {semanticMap && !loading && (
+          {semanticMap && !isLoading && (
             <div className="mt-4 text-center space-y-2">
               <p className="text-sm text-muted-foreground">
                 Showing semantic relationships for{' '}

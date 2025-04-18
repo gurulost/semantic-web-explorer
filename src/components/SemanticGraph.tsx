@@ -1,8 +1,12 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import CytoscapeComponent from 'react-cytoscapejs';
 import cytoscape from 'cytoscape';
+import graphml from 'cytoscape-graphml';
+import chroma from 'chroma-js';
 import { Node, Edge } from '../services/api';
+
+// Register the graphml extension
+cytoscape.use(graphml);
 
 interface SemanticGraphProps {
   nodes: Node[];
@@ -12,9 +16,13 @@ interface SemanticGraphProps {
 
 const SemanticGraph: React.FC<SemanticGraphProps> = ({ nodes, edges, isLoading = false }) => {
   const cyRef = useRef<cytoscape.Core | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const [tooltipStyle, setTooltipStyle] = useState({ display: 'none', left: 0, top: 0 });
   const [tooltipContent, setTooltipContent] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Generate dynamic color scale based on number of clusters
+  const maxCluster = Math.max(...nodes.map(node => node.cluster), 0);
+  const colorScale = chroma.scale(['#3498db', '#e74c3c']).mode('lab').colors(maxCluster + 1);
 
   // Convert data to cytoscape format
   const elements = [
@@ -23,7 +31,8 @@ const SemanticGraph: React.FC<SemanticGraphProps> = ({ nodes, edges, isLoading =
         id: node.id, 
         label: node.id,
         size: node.size,
-        cluster: node.cluster
+        cluster: node.cluster,
+        color: colorScale[node.cluster]
       },
       position: { 
         x: node.x * 200, 
@@ -36,18 +45,19 @@ const SemanticGraph: React.FC<SemanticGraphProps> = ({ nodes, edges, isLoading =
         id: `edge-${i}`, 
         source, 
         target 
-      }
+      },
+      classes: 'hidden-edge'
     }))
   ];
 
-  // Cytoscape style
+  // Cytoscape style with dynamic colors
   const cytoscapeStyle = [
     {
       selector: 'node',
       style: {
         'width': 'data(size)',
         'height': 'data(size)',
-        'background-color': 'mapData(cluster, 0, 7, #3498db, #e74c3c)',
+        'background-color': 'data(color)',
         'label': 'data(label)',
         'color': '#fff',
         'text-outline-color': '#000',
@@ -70,9 +80,23 @@ const SemanticGraph: React.FC<SemanticGraphProps> = ({ nodes, edges, isLoading =
       style: {
         'width': 1,
         'line-color': '#ccc',
-        'opacity': 0.6,
+        'opacity': 0,
         'z-index': 1,
-        'curve-style': 'bezier'
+        'curve-style': 'bezier',
+        'transition-property': 'opacity',
+        'transition-duration': '0.3s'
+      }
+    },
+    {
+      selector: '.hidden-edge',
+      style: {
+        'opacity': 0
+      }
+    },
+    {
+      selector: '.visible-edge',
+      style: {
+        'opacity': 0.6
       }
     },
     {
@@ -109,41 +133,27 @@ const SemanticGraph: React.FC<SemanticGraphProps> = ({ nodes, edges, isLoading =
   useEffect(() => {
     if (!cyRef.current) return;
 
-    // Set up event handlers
     const cy = cyRef.current;
 
+    // Show edges only for hovered/selected nodes
     cy.on('mouseover', 'node', (event) => {
       const node = event.target;
-      const position = node.renderedPosition();
+      cy.edges().removeClass('visible-edge');
+      node.connectedEdges().addClass('visible-edge');
       
       // Show tooltip
+      const position = node.renderedPosition();
       setTooltipContent(node.data('label'));
       setTooltipStyle({
         display: 'block',
         left: position.x + 10,
         top: position.y - 30
       });
-      
-      // Highlight the node
-      node.style({
-        'width': (node.data('size') * 1.2),
-        'height': (node.data('size') * 1.2),
-        'z-index': 100
-      });
     });
 
-    cy.on('mouseout', 'node', (event) => {
-      const node = event.target;
-      
-      // Hide tooltip
+    cy.on('mouseout', 'node', () => {
+      cy.edges().removeClass('visible-edge');
       setTooltipStyle({ ...tooltipStyle, display: 'none' });
-      
-      // Reset node size
-      node.style({
-        'width': node.data('size'),
-        'height': node.data('size'),
-        'z-index': 10
-      });
     });
 
     cy.on('tap', 'node', (event) => {
