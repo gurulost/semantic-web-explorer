@@ -24,19 +24,30 @@ export interface MapResponse {
 
 export const getSemanticMap = async (query: string): Promise<MapResponse> => {
   try {
-    // Always use mock data in development if no API_BASE_URL is provided
-    if (!API_BASE_URL) {
-      console.log('Using mock data (no API_BASE_URL provided)');
-      return getMockSemanticMap(query);
+    console.log(`Attempting to fetch semantic map for: ${query}`);
+    
+    // Use the proxy in development, or the API_BASE_URL in production
+    const url = `${API_BASE_URL}/map`;
+    console.log(`Fetching from: ${url}`);
+    
+    const response = await axios.post(url, { query });
+    console.log('Received response:', response.data);
+    
+    // If we receive an empty nodes array or just one node (the query word), 
+    // the word probably wasn't found in the vocabulary
+    if (!response.data.nodes || response.data.nodes.length <= 1) {
+      console.warn('Word not found or no related words in vocabulary');
+      if (response.data.nodes.length === 1) {
+        return response.data; // Return just the query word node
+      }
+      throw new Error('Word not found in vocabulary');
     }
-
-    console.log(`Fetching from API: ${API_BASE_URL}/map`);
-    const response = await axios.post(`${API_BASE_URL}/map`, { query });
+    
     return response.data;
   } catch (error) {
     console.error('Error fetching semantic map:', error);
     
-    // Fall back to mock data on error in development
+    // Fall back to mock data if in development
     if (!API_BASE_URL) {
       console.log('Falling back to mock data after error');
       return getMockSemanticMap(query);

@@ -4,18 +4,19 @@ version: '3'
 services:
   backend:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      - gensim_data:/root/gensim-data
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
   frontend:
     build:
-      context: .
-      dockerfile: frontend/Dockerfile
+      context: ./frontend
+      dockerfile: Dockerfile
     ports:
       - "8080:8080"
     volumes:
@@ -25,3 +26,6 @@ services:
       - VITE_API_BASE_URL=
     depends_on:
       - backend
+
+volumes:
+  gensim_data:

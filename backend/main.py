@@ -1,5 +1,5 @@
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Tuple
@@ -7,10 +7,14 @@ import numpy as np
 import umap
 import gensim.downloader as api
 from sklearn.cluster import KMeans
+import os
+import time
 
 # ---------- Load embeddings once ---------- #
-print("Loading GloVe 100-d ...")
+print("Loading GloVe 100-d embeddings... (this might take a few minutes on first run)")
+start_time = time.time()
 GLOVE = api.load("glove-wiki-gigaword-100")   # ~200 MB, one-time
+print(f"GloVe embeddings loaded in {time.time() - start_time:.2f} seconds")
 DIM = 100
 
 def vec(word: str) -> np.ndarray:
