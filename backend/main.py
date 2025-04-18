@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, BaseSettings
@@ -32,12 +31,39 @@ GLOVE = api.load("glove-wiki-gigaword-100")   # Should be already downloaded dur
 print(f"GloVe embeddings loaded in {time.time() - start_time:.2f} seconds")
 DIM = 100
 
-# Create an LRU cache for word vectors (10,000 entries)
+# Create an LRU cache for word vectors (10,000 entries) and UMAP results
 @functools.lru_cache(maxsize=10_000)
 def vec(word: str) -> np.ndarray:
     if word in GLOVE:
         return GLOVE[word]
     raise KeyError(f"'{word}' not found in vocabulary")
+
+@functools.lru_cache(maxsize=100)
+def generate_layout_and_clusters(frozen_vocab: frozenset) -> tuple:
+    """
+    Generate UMAP layout and clusters for a given vocabulary set.
+    Uses frozen_vocab as input since cache keys must be immutable.
+    """
+    vocab = list(frozen_vocab)
+    M = np.vstack([vec(w) for w in vocab])
+    
+    # Generate 2D layout
+    coords = umap.UMAP(
+        n_components=2,
+        n_neighbors=15,
+        min_dist=0.1,
+        metric="cosine",
+        random_state=42
+    ).fit_transform(M)
+    
+    # Clustering
+    clusters = KMeans(
+        n_clusters=settings.n_clusters, 
+        n_init="auto", 
+        random_state=42
+    ).fit(M).labels_.tolist()
+    
+    return coords, clusters
 
 def cosine_similarity(v1: np.ndarray, v2: np.ndarray) -> float:
     return float(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)))
@@ -136,29 +162,16 @@ def build_map(root: str, second_word: Optional[str], n: int) -> MapResponse:
         sims = mat @ v_root / (np.linalg.norm(mat, axis=1) * np.linalg.norm(v_root) + 1e-9)
         top_idx = sims.argsort()[-(n+1):][::-1]
         
-        # Create vocabulary list
+        # Generate vocabulary list
         vocab = [root]
         if second_word and second_word in GLOVE:
             vocab.append(second_word)
         vocab.extend([w for w in all_words[top_idx] if w not in vocab][:n-1])
         
-        # Generate embeddings matrix
-        M = np.vstack([vec(w) for w in vocab])
+        # Use cached layout and clustering
+        coords, clusters = generate_layout_and_clusters(frozenset(vocab))
         
-        # 2-D layout
-        coords = umap.UMAP(
-            n_components=2,
-            n_neighbors=15,
-            min_dist=0.1,
-            metric="cosine",
-            random_state=42
-        ).fit_transform(M)
-        
-        # Clustering for colors
-        kmeans = KMeans(n_clusters=settings.n_clusters, n_init="auto", random_state=42).fit(M)
-        clusters = kmeans.labels_.tolist()
-        
-        # Generate nodes
+        # Generate nodes with cached results
         nodes = [Node(
             id=w,
             x=float(coords[i,0]),
@@ -186,4 +199,3 @@ def build_map(root: str, second_word: Optional[str], n: int) -> MapResponse:
 @app.post("/map", response_model=MapResponse)
 def get_map(q: Query):
     return build_map(q.query.lower(), q.second_word.lower() if q.second_word else None, q.n)
-

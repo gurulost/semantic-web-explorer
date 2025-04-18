@@ -11,6 +11,15 @@ import {
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
+import { Node } from '@/services/api';
+
+declare module 'cytoscape' {
+  interface Core {
+    svg(options?: { scale?: number; full?: boolean; output?: 'string' | 'svg' }): string;
+  }
+}
+
+cytoscape.use(graphml);
 
 interface SemanticGraphProps {
   nodes: Node[];
