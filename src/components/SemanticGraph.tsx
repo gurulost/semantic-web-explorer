@@ -1,17 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import CytoscapeComponent from 'react-cytoscapejs';
-import cytoscape from 'cytoscape';
-import graphml from 'cytoscape-graphml';
-import chroma from 'chroma-js';
-import { Download } from 'lucide-react';
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger 
-} from '@/components/ui/dropdown-menu';
+import { Download, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Node } from '@/services/api';
+import { useToast } from '@/hooks/use-toast';
 
 declare module 'cytoscape' {
   interface Core {
@@ -26,13 +18,17 @@ interface SemanticGraphProps {
   edges: string[][];
   isLoading?: boolean;
   commonNeighbors?: string[];
+  onLoadMore?: () => void;
+  hasMore?: boolean;
 }
 
 const SemanticGraph: React.FC<SemanticGraphProps> = ({ 
   nodes, 
   edges, 
   isLoading = false, 
-  commonNeighbors = [] 
+  commonNeighbors = [],
+  onLoadMore,
+  hasMore = false
 }) => {
   const cyRef = useRef<cytoscape.Core | null>(null);
   const [tooltipStyle, setTooltipStyle] = useState({ display: 'none', left: 0, top: 0 });
@@ -228,7 +224,18 @@ const SemanticGraph: React.FC<SemanticGraphProps> = ({
         </div>
       ) : (
         <>
-          <div className="absolute top-4 right-4 z-10">
+          <div className="absolute top-4 right-4 z-10 flex gap-2">
+            {hasMore && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onLoadMore}
+                disabled={isLoading}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Load More
+              </Button>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="icon">

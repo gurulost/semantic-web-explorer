@@ -1,4 +1,3 @@
-
 import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
@@ -26,25 +25,26 @@ export interface MapResponse {
   nodes: Node[];
   edges: string[][];
   comparison?: ComparisonResult;
+  next_cursor?: number | null;
 }
 
-export const getSemanticMap = async (query: string, secondWord?: string): Promise<MapResponse> => {
+export const getSemanticMap = async (
+  query: string, 
+  secondWord?: string,
+  cursor?: number
+): Promise<MapResponse> => {
   try {
-    console.log(`Fetching semantic map for: ${query}${secondWord ? ` and ${secondWord}` : ''}`);
+    console.log(`Fetching semantic map for: ${query}${secondWord ? ` and ${secondWord}` : ''} cursor: ${cursor}`);
     
     const url = `${API_BASE_URL}/map`;
-    console.log(`Fetching from: ${url}`);
-    
     const response = await axios.post(url, { 
       query,
       second_word: secondWord,
-      n: secondWord ? 30 : 40  // Fewer neighbors when comparing two words
+      n: secondWord ? 30 : 40,
+      cursor
     });
     
-    console.log('Received response:', response.data);
-    
     if (!response.data.nodes || response.data.nodes.length <= 1) {
-      console.warn('Word not found or no related words in vocabulary');
       throw new Error('Word not found in vocabulary');
     }
     

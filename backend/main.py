@@ -78,7 +78,8 @@ def cosine_similarity(v1: np.ndarray, v2: np.ndarray) -> float:
 class Query(BaseModel):
     query: str
     second_word: Optional[str] = None
-    n: int = settings.max_neighbours  # how many neighbours to return
+    n: int = settings.max_neighbours
+    cursor: Optional[int] = None  # Starting index for pagination
 
 class Node(BaseModel):
     id: str
@@ -96,6 +97,7 @@ class MapResponse(BaseModel):
     nodes: List[Node]
     edges: List[List[str]]
     comparison: Optional[ComparisonResult] = None
+    next_cursor: Optional[int] = None
 
 # ---------- FastAPI app ---------- #
 app = FastAPI(title="Semantic-Map API")
@@ -127,16 +129,13 @@ def find_common_neighbors(word1: str, word2: str, n: int = 10) -> List[str]:
     all_words = np.array(list(GLOVE.key_to_index.keys()))
     return [w for w in all_words[top_idx] if w not in [word1, word2]]
 
-def build_map(root: str, second_word: Optional[str], n: int) -> MapResponse:
-    # Check cache first
-    cache_key = f"{root}:{second_word or ''}:{n}"
+def build_map(root: str, second_word: Optional[str], n: int, cursor: Optional[int] = None) -> MapResponse:
+    cache_key = f"{root}:{second_word or ''}:{n}:{cursor or 0}"
     if cache_key in map_cache:
         return map_cache[cache_key]
     
     try:
         v_root = vec(root)
-        
-        # If second word provided, include it in visualization
         if second_word:
             try:
                 v_second = vec(second_word)
@@ -162,17 +161,24 @@ def build_map(root: str, second_word: Optional[str], n: int) -> MapResponse:
         else:
             comparison = None
             
-        # Find nearest neighbors
+        # Find nearest neighbors with pagination
         all_words = np.array(list(GLOVE.key_to_index.keys()))
         mat = GLOVE.vectors
         sims = mat @ v_root / (np.linalg.norm(mat, axis=1) * np.linalg.norm(v_root) + 1e-9)
         top_idx = sims.argsort()[-(n+1):][::-1]
         
-        # Generate vocabulary list
+        # Generate vocabulary list with pagination
+        start_idx = cursor or 0
+        end_idx = min(start_idx + 30, n)  # Show 30 nodes per page
+        
         vocab = [root]
         if second_word and second_word in GLOVE:
             vocab.append(second_word)
-        vocab.extend([w for w in all_words[top_idx] if w not in vocab][:n-1])
+        
+        vocab.extend([w for w in all_words[top_idx] if w not in vocab][start_idx:end_idx])
+        
+        has_more = end_idx < len(top_idx)
+        next_cursor = end_idx if has_more else None
         
         # Use cached layout and clustering
         coords, clusters = generate_layout_and_clusters(frozenset(vocab))
@@ -191,11 +197,14 @@ def build_map(root: str, second_word: Optional[str], n: int) -> MapResponse:
         if second_word and second_word in vocab:
             edges.extend([[second_word, w] for w in vocab if w not in [root, second_word]])
         
-        result = MapResponse(nodes=nodes, edges=edges, comparison=comparison)
+        result = MapResponse(
+            nodes=nodes, 
+            edges=edges, 
+            comparison=comparison if 'comparison' in locals() else None,
+            next_cursor=next_cursor
+        )
         
-        # Cache the result
         map_cache[cache_key] = result
-        
         return result
         
     except KeyError:
@@ -204,4 +213,9 @@ def build_map(root: str, second_word: Optional[str], n: int) -> MapResponse:
 # ---------- Route ---------- #
 @app.post("/map", response_model=MapResponse)
 def get_map(q: Query):
-    return build_map(q.query.lower(), q.second_word.lower() if q.second_word else None, q.n)
+    return build_map(
+        q.query.lower(), 
+        q.second_word.lower() if q.second_word else None, 
+        q.n,
+        q.cursor
+    )
