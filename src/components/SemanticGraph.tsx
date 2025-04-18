@@ -3,10 +3,14 @@ import CytoscapeComponent from 'react-cytoscapejs';
 import cytoscape from 'cytoscape';
 import graphml from 'cytoscape-graphml';
 import chroma from 'chroma-js';
-import { Node, Edge } from '../services/api';
-
-// Register the graphml extension
-cytoscape.use(graphml);
+import { Download } from 'lucide-react';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
 
 interface SemanticGraphProps {
   nodes: Node[];
@@ -15,17 +19,20 @@ interface SemanticGraphProps {
   commonNeighbors?: string[];
 }
 
-const SemanticGraph: React.FC<SemanticGraphProps> = ({ nodes, edges, isLoading = false, commonNeighbors = [] }) => {
+const SemanticGraph: React.FC<SemanticGraphProps> = ({ 
+  nodes, 
+  edges, 
+  isLoading = false, 
+  commonNeighbors = [] 
+}) => {
   const cyRef = useRef<cytoscape.Core | null>(null);
   const [tooltipStyle, setTooltipStyle] = useState({ display: 'none', left: 0, top: 0 });
   const [tooltipContent, setTooltipContent] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Generate dynamic color scale based on number of clusters
   const maxCluster = Math.max(...nodes.map(node => node.cluster), 0);
   const colorScale = chroma.scale(['#3498db', '#e74c3c']).mode('lab').colors(maxCluster + 1);
 
-  // Convert data to cytoscape format
   const elements = [
     ...nodes.map(node => ({
       data: { 
@@ -52,7 +59,6 @@ const SemanticGraph: React.FC<SemanticGraphProps> = ({ nodes, edges, isLoading =
     }))
   ];
 
-  // Cytoscape style with dynamic colors
   const cytoscapeStyle = [
     {
       selector: 'node',
@@ -140,18 +146,34 @@ const SemanticGraph: React.FC<SemanticGraphProps> = ({ nodes, edges, isLoading =
     }
   ];
 
+  const exportSVG = () => {
+    if (!cyRef.current) return;
+    
+    const svg = cyRef.current.svg({
+      scale: 2,
+      full: true,
+      output: 'svg'
+    });
+    
+    const blob = new Blob([svg], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'semantic-graph.svg';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   useEffect(() => {
     if (!cyRef.current) return;
 
     const cy = cyRef.current;
 
-    // Show edges only for hovered/selected nodes
     cy.on('mouseover', 'node', (event) => {
       const node = event.target;
       cy.edges().removeClass('visible-edge');
       node.connectedEdges().addClass('visible-edge');
       
-      // Show tooltip
       const position = node.renderedPosition();
       setTooltipContent(node.data('label'));
       setTooltipStyle({
@@ -174,7 +196,6 @@ const SemanticGraph: React.FC<SemanticGraphProps> = ({ nodes, edges, isLoading =
 
   useEffect(() => {
     if (cyRef.current && !isLoading && nodes.length > 0) {
-      // Center the graph
       cyRef.current.fit();
       cyRef.current.zoom({
         level: 1.2,
@@ -198,6 +219,20 @@ const SemanticGraph: React.FC<SemanticGraphProps> = ({ nodes, edges, isLoading =
         </div>
       ) : (
         <>
+          <div className="absolute top-4 right-4 z-10">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <Download className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onSelect={exportSVG}>
+                  Export SVG (High Resolution)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           <CytoscapeComponent
             elements={elements}
             style={{ width: '100%', height: '100%' }}
