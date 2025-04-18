@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import SearchBar from '@/components/SearchBar';
@@ -16,13 +17,15 @@ const Index = () => {
     queryKey: ['semanticMap', searchTerm, secondWord],
     queryFn: () => getSemanticMap(searchTerm, secondWord),
     enabled: !!searchTerm,
-    onSuccess: (data) => {
-      setMap(data);
-      if (data.comparison) {
-        toast({
-          title: "Word Comparison",
-          description: data.comparison.similarity_explanation,
-        });
+    meta: {
+      onSuccess: (data) => {
+        setMap(data);
+        if (data.comparison) {
+          toast({
+            title: "Word Comparison",
+            description: data.comparison.similarity_explanation,
+          });
+        }
       }
     },
     onError: (error: Error) => {
