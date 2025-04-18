@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import SearchBar from '@/components/SearchBar';
@@ -6,20 +5,30 @@ import SemanticGraph from '@/components/SemanticGraph';
 import Legend from '@/components/Legend';
 import { getSemanticMap, Node, MapResponse } from '@/services/api';
 import { useToast } from '@/components/ui/use-toast';
+import { ComparisonResult } from '@/services/api';
 
 const Index = () => {
   const [semanticMap, setSemanticMap] = useState<MapResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [secondWord, setSecondWord] = useState<string | undefined>();
   const { toast } = useToast();
 
-  const handleSearch = async (query: string) => {
+  const handleSearch = async (query: string, second?: string) => {
     setLoading(true);
     setSearchTerm(query);
+    setSecondWord(second);
     
     try {
-      const result = await getSemanticMap(query);
+      const result = await getSemanticMap(query, second);
       setSemanticMap(result);
+      
+      if (result.comparison) {
+        toast({
+          title: "Word Comparison",
+          description: result.comparison.similarity_explanation,
+        });
+      }
     } catch (error) {
       let message = 'Failed to generate semantic map';
       
@@ -72,11 +81,27 @@ const Index = () => {
           
           {/* Info section */}
           {semanticMap && !loading && (
-            <div className="mt-4 text-center">
+            <div className="mt-4 text-center space-y-2">
               <p className="text-sm text-muted-foreground">
-                Showing semantic relationships for <span className="font-medium text-primary">{searchTerm}</span> 
-                with {semanticMap.nodes.length - 1} related words
+                Showing semantic relationships for{' '}
+                <span className="font-medium text-primary">{searchTerm}</span>
+                {secondWord && (
+                  <> and <span className="font-medium text-primary">{secondWord}</span></>
+                )}
               </p>
+              {semanticMap.comparison && (
+                <div className="text-sm space-y-1">
+                  <p>{semanticMap.comparison.similarity_explanation}</p>
+                  {semanticMap.comparison.common_neighbors.length > 0 && (
+                    <p>
+                      Common semantic neighbors:{' '}
+                      <span className="font-medium">
+                        {semanticMap.comparison.common_neighbors.join(', ')}
+                      </span>
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

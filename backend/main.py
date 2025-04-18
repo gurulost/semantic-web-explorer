@@ -2,7 +2,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 import numpy as np
 import umap
 import gensim.downloader as api
@@ -22,9 +22,13 @@ def vec(word: str) -> np.ndarray:
         return GLOVE[word]
     raise KeyError(f"'{word}' not found in vocabulary")
 
+def cosine_similarity(v1: np.ndarray, v2: np.ndarray) -> float:
+    return float(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)))
+
 # ---------- I/O models ---------- #
 class Query(BaseModel):
     query: str
+    second_word: Optional[str] = None
     n: int = 40       # how many neighbours to return
 
 class Node(BaseModel):
@@ -34,65 +38,121 @@ class Node(BaseModel):
     size: float
     cluster: int
 
+class ComparisonResult(BaseModel):
+    similarity: float
+    common_neighbors: List[str]
+    similarity_explanation: str
+
 class MapResponse(BaseModel):
     nodes: List[Node]
-    edges: List[List[str]]  # Match frontend's expectation: string[][]
+    edges: List[List[str]]
+    comparison: Optional[ComparisonResult] = None
 
 # ---------- FastAPI app ---------- #
 app = FastAPI(title="Semantic-Map API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],        # tighten in prod
+    allow_origins=["*"],
     allow_methods=["POST"],
     allow_headers=["*"],
 )
 
 # ---------- Core algorithm ---------- #
-def build_map(root: str, n: int) -> MapResponse:
-    # 1. find n nearest neighbours by cosine sim
+def find_common_neighbors(word1: str, word2: str, n: int = 10) -> List[str]:
+    """Find words that are semantically similar to both input words."""
+    v1, v2 = vec(word1), vec(word2)
+    
+    # Get similarities to all words
+    mat = GLOVE.vectors
+    sims1 = mat @ v1 / (np.linalg.norm(mat, axis=1) * np.linalg.norm(v1) + 1e-9)
+    sims2 = mat @ v2 / (np.linalg.norm(mat, axis=1) * np.linalg.norm(v2) + 1e-9)
+    
+    # Combine similarities
+    combined_sims = (sims1 + sims2) / 2
+    top_idx = combined_sims.argsort()[-n:][::-1]
+    
     all_words = np.array(list(GLOVE.key_to_index.keys()))
+    return [w for w in all_words[top_idx] if w not in [word1, word2]]
+
+def build_map(root: str, second_word: Optional[str], n: int) -> MapResponse:
     try:
         v_root = vec(root)
-    except KeyError:
-        # Return empty map if word not in vocabulary
-        return MapResponse(
-            nodes=[Node(id=root, x=0, y=0, size=120, cluster=0)],
-            edges=[]
-        )
         
-    mat = GLOVE.vectors          # (400k, 100)
-    sims = mat @ v_root / (
-        np.linalg.norm(mat, axis=1) * np.linalg.norm(v_root) + 1e-9)
-    top_idx = sims.argsort()[-(n+1):][::-1]   # drop self later
-
-    vocab = [root] + [w for w in all_words[top_idx] if w != root][:n]
-    M = np.vstack([vec(w) for w in vocab])
-
-    # 2. 2-D layout
-    coords = umap.UMAP(
-        n_components=2, n_neighbors=15, min_dist=0.1,
-        metric="cosine", random_state=42).fit_transform(M)
-
-    # 3. clustering for colour
-    kmeans = KMeans(n_clusters=8, n_init="auto", random_state=42).fit(M[1:])  # exclude root
-    clusters = [0] + kmeans.labels_.tolist()  # Root node is cluster 0
-
-    # 4. JSON
-    nodes = [Node(
-        id=w,
-        x=float(coords[i,0]),
-        y=float(coords[i,1]),
-        size=(120 if i==0 else 50),   # central node bigger
-        cluster=int(clusters[i])
-    ) for i,w in enumerate(vocab)]
-    
-    # Format edges as expected by frontend: string[][]
-    edges = [[root, w] for w in vocab[1:]]
-    
-    return MapResponse(nodes=nodes, edges=edges)
+        # If second word provided, include it in visualization
+        if second_word:
+            try:
+                v_second = vec(second_word)
+                similarity = cosine_similarity(v_root, v_second)
+                common = find_common_neighbors(root, second_word)
+                
+                # Generate explanation
+                explanation = f"The words '{root}' and '{second_word}' have a semantic similarity of {similarity:.2f}"
+                if similarity > 0.7:
+                    explanation += " (very similar)"
+                elif similarity > 0.4:
+                    explanation += " (moderately similar)"
+                else:
+                    explanation += " (not very similar)"
+                
+                comparison = ComparisonResult(
+                    similarity=similarity,
+                    common_neighbors=common[:5],
+                    similarity_explanation=explanation
+                )
+            except KeyError:
+                raise HTTPException(status_code=404, detail=f"Word '{second_word}' not found in vocabulary")
+        else:
+            comparison = None
+            
+        # Find nearest neighbors
+        all_words = np.array(list(GLOVE.key_to_index.keys()))
+        mat = GLOVE.vectors
+        sims = mat @ v_root / (np.linalg.norm(mat, axis=1) * np.linalg.norm(v_root) + 1e-9)
+        top_idx = sims.argsort()[-(n+1):][::-1]
+        
+        # Create vocabulary list
+        vocab = [root]
+        if second_word and second_word in GLOVE:
+            vocab.append(second_word)
+        vocab.extend([w for w in all_words[top_idx] if w not in vocab][:n-1])
+        
+        # Generate embeddings matrix
+        M = np.vstack([vec(w) for w in vocab])
+        
+        # 2-D layout
+        coords = umap.UMAP(
+            n_components=2,
+            n_neighbors=15,
+            min_dist=0.1,
+            metric="cosine",
+            random_state=42
+        ).fit_transform(M)
+        
+        # Clustering for colors
+        kmeans = KMeans(n_clusters=8, n_init="auto", random_state=42).fit(M)
+        clusters = kmeans.labels_.tolist()
+        
+        # Generate nodes
+        nodes = [Node(
+            id=w,
+            x=float(coords[i,0]),
+            y=float(coords[i,1]),
+            size=120 if w in [root, second_word] else 50,
+            cluster=int(clusters[i])
+        ) for i,w in enumerate(vocab)]
+        
+        # Generate edges
+        edges = [[root, w] for w in vocab[1:]]
+        if second_word and second_word in vocab:
+            edges.extend([[second_word, w] for w in vocab if w not in [root, second_word]])
+        
+        return MapResponse(nodes=nodes, edges=edges, comparison=comparison)
+        
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Word '{root}' not found in vocabulary")
 
 # ---------- Route ---------- #
 @app.post("/map", response_model=MapResponse)
 def get_map(q: Query):
-    return build_map(q.query.lower(), q.n)
+    return build_map(q.query.lower(), q.second_word.lower() if q.second_word else None, q.n)
