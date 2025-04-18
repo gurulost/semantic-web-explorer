@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { useSemanticSearch } from '@/hooks/useSemanticSearch';
 import { useSearchHistory } from '@/hooks/useSearchHistory';
+import { MapResponse } from '@/services/api';
 
 const Index = () => {
   const { searchTerm, secondWord, semanticMap, setSearch, setMap } = useSemanticSearch();
@@ -30,13 +31,13 @@ const Index = () => {
       setMap(data);
       addToHistory(searchTerm, secondWord);
     } else {
-      setMap(prevMap => {
+      setMap((prevMap: MapResponse | null) => {
         if (!prevMap) return data;
         return {
           ...prevMap,
           nodes: [...prevMap.nodes, ...data.nodes],
           edges: [...prevMap.edges, ...data.edges],
-          next_cursor: data.next_cursor
+          next_cursor: data.next_cursor,
         };
       });
     }
