@@ -1,3 +1,4 @@
+
 import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
@@ -31,7 +32,7 @@ export interface MapResponse {
 export const getSemanticMap = async (
   query: string, 
   secondWord?: string,
-  cursor?: number
+  cursor?: number | null
 ): Promise<MapResponse> => {
   try {
     console.log(`Fetching semantic map for: ${query}${secondWord ? ` and ${secondWord}` : ''} cursor: ${cursor}`);
