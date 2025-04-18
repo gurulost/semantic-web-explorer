@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 // You can set this in an environment variable for production
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 export interface Node {
   id: string;
@@ -24,15 +24,24 @@ export interface MapResponse {
 
 export const getSemanticMap = async (query: string): Promise<MapResponse> => {
   try {
-    // For now, we'll use a mock response to show the UI without the backend
-    if (process.env.NODE_ENV === 'development' && !API_BASE_URL) {
+    // Always use mock data in development if no API_BASE_URL is provided
+    if (!API_BASE_URL) {
+      console.log('Using mock data (no API_BASE_URL provided)');
       return getMockSemanticMap(query);
     }
 
+    console.log(`Fetching from API: ${API_BASE_URL}/map`);
     const response = await axios.post(`${API_BASE_URL}/map`, { query });
     return response.data;
   } catch (error) {
     console.error('Error fetching semantic map:', error);
+    
+    // Fall back to mock data on error in development
+    if (!API_BASE_URL) {
+      console.log('Falling back to mock data after error');
+      return getMockSemanticMap(query);
+    }
+    
     if (axios.isAxiosError(error) && error.response?.status === 404) {
       throw new Error('Word not found in vocabulary');
     }

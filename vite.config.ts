@@ -12,7 +12,8 @@ export default defineConfig(({ mode }) => ({
     proxy: {
       '/map': {
         target: 'http://localhost:8000',
-        changeOrigin: true
+        changeOrigin: true,
+        rewrite: (path) => path
       }
     }
   },
