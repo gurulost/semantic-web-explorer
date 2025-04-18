@@ -13,7 +13,7 @@ import time
 # ---------- Load embeddings once ---------- #
 print("Loading GloVe 100-d embeddings... (this might take a few minutes on first run)")
 start_time = time.time()
-GLOVE = api.load("glove-wiki-gigaword-100")   # ~200 MB, one-time
+GLOVE = api.load("glove-wiki-gigaword-100")   # Should be already downloaded during container build
 print(f"GloVe embeddings loaded in {time.time() - start_time:.2f} seconds")
 DIM = 100
 

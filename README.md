@@ -19,7 +19,8 @@ docker-compose up
 This will:
 1. Build and start the backend on port 8000
 2. Build and start the frontend on port 8080
-3. Download the GloVe embeddings (~200MB) on first run
+3. Download the GloVe embeddings (~200MB) during the first build
+4. Store the embeddings in a persistent Docker volume
 
 Then open http://localhost:8080 in your browser.
 
