@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Compare } from 'lucide-react';
+import { Search, SplitSquareVertical } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
 interface SearchBarProps {
@@ -75,7 +75,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSearch, isLoading = false }) =>
           }}
           disabled={isLoading}
         >
-          <Compare className="h-4 w-4 mr-2" />
+          <SplitSquareVertical className="h-4 w-4 mr-2" />
           {isComparing ? 'Single Word' : 'Compare Words'}
         </Button>
         <Button type="submit" disabled={isLoading || !query.trim()}>
