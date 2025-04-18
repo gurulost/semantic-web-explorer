@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import SearchBar from '@/components/SearchBar';
 import SemanticGraph from '@/components/SemanticGraph';
@@ -16,31 +16,35 @@ const Index = () => {
   const { history, addToHistory } = useSearchHistory();
   const { toast } = useToast();
 
-  const { isLoading } = useQuery({
+  const { data, error, isLoading } = useQuery({
     queryKey: ['semanticMap', searchTerm, secondWord],
     queryFn: () => getSemanticMap(searchTerm, secondWord),
     enabled: !!searchTerm,
-    meta: {
-      onSuccess: (data) => {
-        setMap(data);
-        addToHistory(searchTerm, secondWord);
-        if (data.comparison) {
-          toast({
-            title: "Word Comparison",
-            description: data.comparison.similarity_explanation,
-          });
-        }
-      }
-    },
-    onError: (error: Error) => {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
-      setMap(null);
-    }
   });
+  
+  // Handle successful data fetching
+  useEffect(() => {
+    if (!data) return;
+    setMap(data);
+    addToHistory(searchTerm, secondWord);
+    if (data.comparison) {
+      toast({
+        title: "Word Comparison",
+        description: data.comparison.similarity_explanation,
+      });
+    }
+  }, [data, searchTerm, secondWord, addToHistory, setMap, toast]);
+  
+  // Handle errors
+  useEffect(() => {
+    if (!error) return;
+    toast({
+      title: 'Error',
+      description: (error as Error).message,
+      variant: 'destructive',
+    });
+    setMap(null);
+  }, [error, toast, setMap]);
 
   const handleSearch = async (query: string, second?: string) => {
     setSearch(query, second);
