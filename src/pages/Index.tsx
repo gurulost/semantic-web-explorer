@@ -24,6 +24,7 @@ const Index = () => {
     enabled: !!searchTerm,
   });
   
+  // Handle successful data fetching
   useEffect(() => {
     if (!data) return;
     
@@ -50,6 +51,7 @@ const Index = () => {
     }
   }, [data, searchTerm, secondWord, cursor, addToHistory, setMap, toast]);
   
+  // Handle errors
   useEffect(() => {
     if (!error) return;
     toast({
