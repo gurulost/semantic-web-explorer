@@ -4,13 +4,16 @@ import { Card, CardContent } from '@/components/ui/card';
 import SearchBar from '@/components/SearchBar';
 import SemanticGraph from '@/components/SemanticGraph';
 import Legend from '@/components/Legend';
+import HistoryChips from '@/components/HistoryChips';
 import { getSemanticMap } from '@/services/api';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { useSemanticSearch } from '@/hooks/useSemanticSearch';
+import { useSearchHistory } from '@/hooks/useSearchHistory';
 
 const Index = () => {
   const { searchTerm, secondWord, semanticMap, setSearch, setMap } = useSemanticSearch();
+  const { history, addToHistory } = useSearchHistory();
   const { toast } = useToast();
 
   const { isLoading } = useQuery({
@@ -20,6 +23,7 @@ const Index = () => {
     meta: {
       onSuccess: (data) => {
         setMap(data);
+        addToHistory(searchTerm, secondWord);
         if (data.comparison) {
           toast({
             title: "Word Comparison",
@@ -57,9 +61,10 @@ const Index = () => {
       {/* Main content */}
       <main className="flex-1 p-6 flex flex-col">
         <div className="max-w-7xl mx-auto w-full flex-1 flex flex-col">
-          {/* Search bar */}
-          <div className="mb-6 flex justify-center">
+          {/* Search bar and history */}
+          <div className="mb-6 space-y-4">
             <SearchBar onSearch={handleSearch} isLoading={isLoading} />
+            <HistoryChips history={history} onSelect={handleSearch} />
           </div>
           
           {/* Graph visualization */}
@@ -69,6 +74,7 @@ const Index = () => {
                 nodes={semanticMap?.nodes || []} 
                 edges={semanticMap?.edges || []} 
                 isLoading={isLoading}
+                commonNeighbors={semanticMap?.comparison?.common_neighbors}
               />
             </CardContent>
           </Card>

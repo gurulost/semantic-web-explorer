@@ -12,9 +12,10 @@ interface SemanticGraphProps {
   nodes: Node[];
   edges: string[][];
   isLoading?: boolean;
+  commonNeighbors?: string[];
 }
 
-const SemanticGraph: React.FC<SemanticGraphProps> = ({ nodes, edges, isLoading = false }) => {
+const SemanticGraph: React.FC<SemanticGraphProps> = ({ nodes, edges, isLoading = false, commonNeighbors = [] }) => {
   const cyRef = useRef<cytoscape.Core | null>(null);
   const [tooltipStyle, setTooltipStyle] = useState({ display: 'none', left: 0, top: 0 });
   const [tooltipContent, setTooltipContent] = useState('');
@@ -44,9 +45,10 @@ const SemanticGraph: React.FC<SemanticGraphProps> = ({ nodes, edges, isLoading =
       data: { 
         id: `edge-${i}`, 
         source, 
-        target 
+        target,
+        isCommon: commonNeighbors.includes(source) && commonNeighbors.includes(target)
       },
-      classes: 'hidden-edge'
+      classes: ['hidden-edge', commonNeighbors.includes(source) && commonNeighbors.includes(target) ? 'common-edge' : ''].filter(Boolean).join(' ')
     }))
   ];
 
@@ -85,6 +87,14 @@ const SemanticGraph: React.FC<SemanticGraphProps> = ({ nodes, edges, isLoading =
         'curve-style': 'bezier',
         'transition-property': 'opacity',
         'transition-duration': '0.3s'
+      }
+    },
+    {
+      selector: '.common-edge',
+      style: {
+        'line-color': '#e74c3c',
+        'width': 2,
+        'z-index': 2
       }
     },
     {
